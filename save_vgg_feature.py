@@ -107,11 +107,14 @@ if __name__ == "__main__":
 
     parser.add_argument("--data_dir", default="data", type=str, help="Path for data dir")
     parser.add_argument("--img_dir", default="img", type=str, help="Path for img dir")
-    parser.add_argument("--feature_filen", default="img_vgg_features.pt", type=str, help="Filename for preprocessed image features")
+    parser.add_argument("--feature_file", default="img_vgg_features.pt", type=str, help="Filename for preprocessed image features")
 
     args = parser.parse_args()
 
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
     model = vgg16_notop(pretrained=True)
+    model.to(device)
     model.eval()
 
     # Only load the images that is in train/dev/test
@@ -132,15 +135,16 @@ if __name__ == "__main__":
             im = Image.open(img_path)
             im = im.resize((224, 224))
             im = np.array(im)[:, :, :3]  # Some images have 4th channel, which is transparency value
-        except:
+        except Exception as inst:
             print("{} error!".format(img_id))
+            print(inst)
             continue
 
         for c in range(3):
             im[:, :, c] = im[:, :, c] - mean_pixel[c]
         im = im.transpose((2, 0, 1))
         im = np.expand_dims(im, axis=0)
-        im = torch.Tensor(im)
+        im = torch.Tensor(im).to(device)
         with torch.no_grad():
             img_feature = model(im)
 
@@ -150,7 +154,6 @@ if __name__ == "__main__":
 
         if (idx + 1) % 100 == 0:
             print("{} done".format(idx + 1))
-            break
 
     # Save features with torch.save
     torch.save(img_features, os.path.join(args.data_dir, args.feature_file))
