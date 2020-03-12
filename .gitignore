@@ -137,3 +137,5 @@ data/img/
 wordvec/
 
 img_vgg_features.pt
+
+model/

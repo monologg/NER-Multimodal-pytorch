@@ -107,7 +107,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--data_dir", default="data", type=str, help="Path for data dir")
     parser.add_argument("--img_dir", default="img", type=str, help="Path for img dir")
-    parser.add_argument("--feature_filename", default="img_vgg_features.pt", type=str, help="Filename for preprocessed image features")
+    parser.add_argument("--feature_filen", default="img_vgg_features.pt", type=str, help="Filename for preprocessed image features")
 
     args = parser.parse_args()
 
@@ -153,4 +153,4 @@ if __name__ == "__main__":
             break
 
     # Save features with torch.save
-    torch.save(img_features, os.path.join(args.data_dir, args.feature_filename))
+    torch.save(img_features, os.path.join(args.data_dir, args.feature_file))
