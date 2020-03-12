@@ -85,18 +85,23 @@ class TweetProcessor(object):
 
             sentence = [[], []]  # [[words], [tags], img_id]
             for line in f:
+                if line.strip() == "":
+                    continue
+
                 if line.startswith("IMGID:"):
                     if sentence[0]:
                         # Add img_id at last
                         img_id = int(line.replace("IMGID:", "").strip())
                         sentence.append(img_id)
                         sentences.append(sentence)
-                        print(sentence)
                         sentence = [[], []]  # Flush
                 else:
-                    word, tag = line.strip().split("\t")
-                    sentence[0].append(word)
-                    sentence[1].append(tag)
+                    try:
+                        word, tag = line.strip().split("\t")
+                        sentence[0].append(word)
+                        sentence[1].append(tag)
+                    except:
+                        logger.info("{} cannot be splitted".format(line))
             return sentences
 
     def _create_examples(self, sentences, set_type):
