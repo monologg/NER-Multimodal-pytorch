@@ -19,6 +19,7 @@ def preprocess_word(word):
     """
     - Do lowercase
     - Regular expression (number, url, hashtag, user)
+        - https://nlp.stanford.edu/projects/glove/preprocess-twitter.rb
 
     :param word: str
     :return: word: str
@@ -33,9 +34,11 @@ def preprocess_word(word):
     elif re.compile(url_re).match(word):
         word = '<URL>'
     elif re.compile(hashtag_re).match(word):
-        word = word[1:]  # only erase `#` at the front
+        # word = word[1:]  # only erase `#` at the front
+        word = '<HASHTAG>'
     elif re.compile(user_re).match(word):
         word = word[1:]  # only erase `@` at the front
+        # word = '<USER>'
 
     return word.lower()
 
@@ -330,7 +333,7 @@ def convert_examples_to_features(examples,
 
         # 3. Verify
         assert len(word_ids) == max_seq_len, "Error with word_ids length {} vs {}".format(len(word_ids), max_seq_len)
-        assert len(char_ids) == max_seq_len, "Error with char_ids length {} vs {} {}".format(len(char_ids), max_seq_len)
+        assert len(char_ids) == max_seq_len, "Error with char_ids length {} vs {}".format(len(char_ids), max_seq_len)
         assert len(label_ids) == max_seq_len, "Error with label_ids length {} vs {}".format(len(label_ids), max_seq_len)
 
         if ex_index < 5:

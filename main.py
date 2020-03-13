@@ -41,8 +41,8 @@ if __name__ == '__main__':
 
     parser.add_argument("--overwrite_w2v", action="store_true", help="Overwriting word vector")
     parser.add_argument("--overwrite_vocab", action="store_true", help="Overwriting vocab")
-    parser.add_argument("--word_vocab_size", default=10000, type=int, help="Maximum size of word vocabulary")
-    parser.add_argument("--char_vocab_size", default=200, type=int, help="Maximum size of character vocabulary")
+    parser.add_argument("--word_vocab_size", default=15000, type=int, help="Maximum size of word vocabulary")
+    parser.add_argument("--char_vocab_size", default=100, type=int, help="Maximum size of character vocabulary")
 
     parser.add_argument("--word_emb_dim", default=200, type=int, help="Word embedding size")
     parser.add_argument("--char_emb_dim", default=30, type=int, help="Character embedding size")
