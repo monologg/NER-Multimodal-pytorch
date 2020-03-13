@@ -23,7 +23,7 @@ class CharCNN(nn.Module):
         # Convolution for each kernel
         self.convs = nn.ModuleList([
             nn.Sequential(
-                nn.Conv1d(char_emb_dim, num_filters, kernel_size),
+                nn.Conv1d(char_emb_dim, num_filters, kernel_size, padding=kernel_size // 2),
                 nn.Tanh(),  # As the paper mentioned
                 nn.MaxPool1d(max_word_len - kernel_size + 1),
                 nn.Dropout(0.25)  # As same as the original code implementation
