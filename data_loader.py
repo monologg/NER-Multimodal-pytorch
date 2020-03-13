@@ -1,4 +1,5 @@
 import os
+import re
 import copy
 import json
 import logging
@@ -12,6 +13,31 @@ from torch.utils.data import TensorDataset
 from utils import load_vocab
 
 logger = logging.getLogger(__name__)
+
+
+def preprocess_word(word):
+    """
+    - Do lowercase
+    - Regular expression (number, url, hashtag, user)
+
+    :param word: str
+    :return: word: str
+    """
+    number_re = r"[-+]?[.\d]*[\d]+[:,.\d]*"
+    url_re = r"https?:\/\/\S+\b|www\.(\w+\.)+\S*"
+    hashtag_re = r"#\S+"
+    user_re = r"@\w+"
+
+    if re.compile(number_re).match(word):
+        word = '<NUMBER>'
+    elif re.compile(url_re).match(word):
+        word = '<URL>'
+    elif re.compile(hashtag_re).match(word):
+        word = word[1:]  # only erase `#` at the front
+    elif re.compile(user_re).match(word):
+        word = word[1:]  # only erase `@` at the front
+
+    return word.lower()
 
 
 class InputExample(object):
@@ -64,7 +90,7 @@ class TweetProcessor(object):
 
     @classmethod
     def get_labels(cls):
-        return ["[PAD]", "[UNK]", "O", "B-PER", "I-PER", "B-LOC", "I-LOC", "B-ORG", "I-ORG", "B-OTHER", "I-OTHER"]
+        return ["[pad]", "[unk]", "O", "B-PER", "I-PER", "B-LOC", "I-LOC", "B-ORG", "I-ORG", "B-OTHER", "I-OTHER"]
 
     @classmethod
     def get_label_vocab(cls):
@@ -99,6 +125,7 @@ class TweetProcessor(object):
                 else:
                     try:
                         word, tag = line.strip().split("\t")
+                        word = preprocess_word(word)
                         sentence[0].append(word)
                         sentence[1].append(tag)
                     except:
@@ -114,7 +141,6 @@ class TweetProcessor(object):
         words_for_vocab, chars_for_vocab = [], []  # For building vocab when it is train set
         examples = []
 
-        print(len(sentences))
         for (i, sentence) in enumerate(sentences):
             words, labels, img_id = sentence[0], sentence[1], sentence[2]
             assert len(words) == len(labels)
@@ -156,9 +182,6 @@ def build_vocab(args, words, chars):
     """
     Save word_vocab, char_vocab as file
     Write all the tokens in vocab. When loading the vocab, limit the size of vocab at that time
-
-    Additional preprocessing
-    - Erase url(https://~~) in word vocab
     """
     if not os.path.exists(args.vocab_dir):
         os.mkdir(args.vocab_dir)
@@ -170,20 +193,19 @@ def build_vocab(args, words, chars):
 
     if not os.path.exists(word_vocab_path) or args.overwrite_vocab:
         word_counts = Counter(words)
-        word_vocab.append("[PAD]")
-        word_vocab.append("[UNK]")
+        word_vocab.append("[pad]")
+        word_vocab.append("[unk]")
         word_vocab.extend([x[0] for x in word_counts.most_common()])
         logger.info("Total word vocabulary size: {}".format(len(word_vocab)))
 
         with open(word_vocab_path, 'w', encoding='utf-8') as f:
             for word in word_vocab:
-                if not word.startswith("http://"):  # Erase url(https://~~) in word vocab
-                    f.write(word + "\n")
+                f.write(word + "\n")
 
     if not os.path.exists(char_vocab_path) or args.overwrite_vocab:
         char_counts = Counter(chars)
-        char_vocab.append("[PAD]")
-        char_vocab.append("[UNK]")
+        char_vocab.append("[pad]")
+        char_vocab.append("[unk]")
         char_vocab.extend([x[0] for x in char_counts.most_common()])
         logger.info("Total char vocabulary size: {}".format(len(char_vocab)))
 
@@ -240,10 +262,10 @@ def load_word_matrix(args, word_vocab):
         else:
             word_matrix[i] = np.random.uniform(-0.25, 0.25, args.word_emb_dim)
             cnt += 1
-    print('{} words not in pretrained matrix'.format(cnt))
+    logger.info('{} words not in pretrained matrix'.format(cnt))
 
     # Save the compressed word vector
-    np.savetxt(compressed_w2v_filename, word_matrix, delimiter=" ")
+    np.savetxt(compressed_w2v_filename, word_matrix, delimiter=" ", fmt="%1.7f")
     # Convert numpy to tensor
     word_matrix = torch.from_numpy(word_matrix)
     return word_matrix
@@ -256,8 +278,8 @@ def convert_examples_to_features(examples,
                                  word_vocab,
                                  char_vocab,
                                  label_vocab,
-                                 pad_token="[PAD]",
-                                 unk_token="[UNK]"):
+                                 pad_token="[pad]",
+                                 unk_token="[unk]"):
     features = []
     for (ex_index, example) in enumerate(examples):
         if ex_index % 5000 == 0:
