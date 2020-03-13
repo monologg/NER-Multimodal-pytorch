@@ -2,15 +2,15 @@ import argparse
 
 from trainer import Trainer, OPTIMIZER_LIST
 from utils import init_logger
-from data_loader import load_and_cache_examples
+from data_loader import load_data
 
 
 def main(args):
     init_logger()
 
-    train_dataset = load_and_cache_examples(args, mode="train")
-    dev_dataset = load_and_cache_examples(args, mode="dev")
-    test_dataset = load_and_cache_examples(args, mode="test")
+    train_dataset = load_data(args, mode="train")
+    dev_dataset = load_data(args, mode="dev")
+    test_dataset = load_data(args, mode="test")
 
     trainer = Trainer(args, train_dataset, dev_dataset, test_dataset)
 
@@ -40,8 +40,9 @@ if __name__ == '__main__':
     parser.add_argument("--max_word_len", default=30, type=int, help="Max word length")
 
     parser.add_argument("--overwrite_w2v", action="store_true", help="Overwriting word vector")
+    parser.add_argument("--overwrite_vocab", action="store_true", help="Overwriting vocab")
     parser.add_argument("--word_vocab_size", default=10000, type=int, help="Maximum size of word vocabulary")
-    parser.add_argument("--char_vocab_size", default=1000, type=int, help="Maximum size of character vocabulary")
+    parser.add_argument("--char_vocab_size", default=200, type=int, help="Maximum size of character vocabulary")
 
     parser.add_argument("--word_emb_dim", default=200, type=int, help="Word embedding size")
     parser.add_argument("--char_emb_dim", default=30, type=int, help="Character embedding size")

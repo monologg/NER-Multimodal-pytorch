@@ -139,5 +139,6 @@ wordvec/
 img_vgg_features.pt
 
 model/
+vocab/
 
 cached*

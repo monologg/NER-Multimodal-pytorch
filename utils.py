@@ -16,8 +16,8 @@ def init_logger():
 
 
 def load_vocab(args):
-    word_vocab_path = os.path.join(args.vocab_dir, "word_vocab_{}".format(args.word_vocab_size))
-    char_vocab_path = os.path.join(args.vocab_dir, "char_vocab_{}".format(args.char_vocab_size))
+    word_vocab_path = os.path.join(args.vocab_dir, "word_vocab")
+    char_vocab_path = os.path.join(args.vocab_dir, "char_vocab")
 
     if not os.path.exists(word_vocab_path):
         logger.warning("Please build word vocab first!")
@@ -34,14 +34,21 @@ def load_vocab(args):
 
     # Load word vocab
     with open(word_vocab_path, "r", encoding="utf-8") as f:
-        for idx, line in enumerate(f):
+        # Set the exact vocab size
+        # If the original vocab size is smaller than args.vocab_size, then set args.vocab_size to original one
+        word_lines = f.readlines()
+        args.word_vocab_size = min(len(word_lines), args.word_vocab_size)
+
+        for idx, line in enumerate(word_lines[:args.word_vocab_size]):
             line = line.strip()
             word_vocab[line] = idx
             word_ids_to_tokens.append(line)
 
     # Load char vocab
     with open(char_vocab_path, "r", encoding="utf-8") as f:
-        for idx, line in enumerate(f):
+        char_lines = f.readlines()
+        args.char_vocab_size = min(len(char_lines), args.char_vocab_size)
+        for idx, line in enumerate(char_lines[:args.char_vocab_size]):
             line = line.strip()
             char_vocab[line] = idx
             char_ids_to_tokens.append(line)

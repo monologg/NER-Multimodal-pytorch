@@ -90,18 +90,23 @@ class TweetProcessor(object):
 
                 if line.startswith("IMGID:"):
                     if sentence[0]:
-                        # Add img_id at last
-                        img_id = int(line.replace("IMGID:", "").strip())
-                        sentence.append(img_id)
                         sentences.append(sentence)
                         sentence = [[], []]  # Flush
+
+                    # Add img_id at last
+                    img_id = int(line.replace("IMGID:", "").strip())
+                    sentence.append(img_id)
                 else:
                     try:
                         word, tag = line.strip().split("\t")
                         sentence[0].append(word)
                         sentence[1].append(tag)
                     except:
-                        logger.info("{} cannot be splitted".format(line))
+                        logger.info("\"{}\" cannot be splitted".format(line.rstrip()))
+            # Flush the last one
+            if sentence[0]:
+                sentences.append(sentence)
+
             return sentences
 
     def _create_examples(self, sentences, set_type):
@@ -109,6 +114,7 @@ class TweetProcessor(object):
         words_for_vocab, chars_for_vocab = [], []  # For building vocab when it is train set
         examples = []
 
+        print(len(sentences))
         for (i, sentence) in enumerate(sentences):
             words, labels, img_id = sentence[0], sentence[1], sentence[2]
             assert len(words) == len(labels)
@@ -147,38 +153,53 @@ class TweetProcessor(object):
 
 
 def build_vocab(args, words, chars):
-    """Save word_vocab, char_vocab as file"""
+    """
+    Save word_vocab, char_vocab as file
+    Write all the tokens in vocab. When loading the vocab, limit the size of vocab at that time
+
+    Additional preprocessing
+    - Erase url(https://~~) in word vocab
+    """
     if not os.path.exists(args.vocab_dir):
         os.mkdir(args.vocab_dir)
 
     word_vocab, char_vocab = [], []
 
-    word_vocab_path = os.path.join(args.vocab_dir, "word_vocab_{}".format(args.word_vocab_size))
-    char_vocab_path = os.path.join(args.vocab_dir, "char_vocab_{}".format(args.char_vocab_size))
+    word_vocab_path = os.path.join(args.vocab_dir, "word_vocab")
+    char_vocab_path = os.path.join(args.vocab_dir, "char_vocab")
 
-    if not os.path.exists(word_vocab_path):
+    if not os.path.exists(word_vocab_path) or args.overwrite_vocab:
         word_counts = Counter(words)
         word_vocab.append("[PAD]")
         word_vocab.append("[UNK]")
         word_vocab.extend([x[0] for x in word_counts.most_common()])
         logger.info("Total word vocabulary size: {}".format(len(word_vocab)))
-        word_vocab = word_vocab[:args.word_vocab_size]
 
         with open(word_vocab_path, 'w', encoding='utf-8') as f:
             for word in word_vocab:
-                f.write(word + "\n")
+                if not word.startswith("http://"):  # Erase url(https://~~) in word vocab
+                    f.write(word + "\n")
 
-    if not os.path.exists(char_vocab_path):
+    if not os.path.exists(char_vocab_path) or args.overwrite_vocab:
         char_counts = Counter(chars)
         char_vocab.append("[PAD]")
         char_vocab.append("[UNK]")
         char_vocab.extend([x[0] for x in char_counts.most_common()])
         logger.info("Total char vocabulary size: {}".format(len(char_vocab)))
-        char_vocab = char_vocab[:args.char_vocab_size]
 
         with open(char_vocab_path, 'w', encoding='utf-8') as f:
             for char in char_vocab:
                 f.write(char + "\n")
+
+    # Set the exact vocab size
+    # If the original vocab size is smaller than args.vocab_size, then set args.vocab_size to original one
+    with open(word_vocab_path, 'r', encoding='utf-8') as f:
+        word_lines = f.readlines()
+        args.word_vocab_size = min(len(word_lines), args.word_vocab_size)
+
+    with open(char_vocab_path, 'r', encoding='utf-8') as f:
+        char_lines = f.readlines()
+        args.char_vocab_size = min(len(char_lines), args.char_vocab_size)
 
 
 def load_word_matrix(args, word_vocab):
@@ -191,14 +212,15 @@ def load_word_matrix(args, word_vocab):
     if os.path.exists(compressed_w2v_filename) and not args.overwrite_w2v:
         word_matrix = np.zeros((args.word_vocab_size, args.word_emb_dim))
         with open(compressed_w2v_filename, 'r', encoding='utf-8') as f:
-            for idx, line in enumerate(f):
-                line = line.rstrip()
-                coefs = np.asarray(line, dtype='float32')
+            for idx, values in enumerate(f):
+                values = values.rstrip().split()
+                coefs = np.asarray(values, dtype='float32')
                 word_matrix[idx] = coefs
         word_matrix = torch.from_numpy(word_matrix)
         return word_matrix
 
     # Making new word vector
+    logger.info("Building word matrix...")
     embedding_index = dict()
     with open(os.path.join(args.wordvec_dir, args.w2v_file), 'r', encoding='utf-8') as f:
         for line in f:
@@ -273,9 +295,11 @@ def convert_examples_to_features(examples,
         # Padding for word and label
         word_padding_length = max_seq_len - len(word_ids)
         word_ids = word_ids + ([word_pad_idx] * word_padding_length)
-        word_ids = word_ids[:max_seq_len]
         label_ids = label_ids + ([label_pad_idx] * word_padding_length)
+
+        word_ids = word_ids[:max_seq_len]
         label_ids = label_ids[:max_seq_len]
+        char_ids = char_ids[:max_seq_len]
 
         # Additional padding for char if word_padding_length > 0
         if word_padding_length > 0:
@@ -284,12 +308,13 @@ def convert_examples_to_features(examples,
 
         # 3. Verify
         assert len(word_ids) == max_seq_len, "Error with word_ids length {} vs {}".format(len(word_ids), max_seq_len)
-        assert len(char_ids) == max_seq_len, "Error with char_ids length {} vs {}".format(len(char_ids), max_seq_len)
+        assert len(char_ids) == max_seq_len, "Error with char_ids length {} vs {} {}".format(len(char_ids), max_seq_len)
         assert len(label_ids) == max_seq_len, "Error with label_ids length {} vs {}".format(len(label_ids), max_seq_len)
 
         if ex_index < 5:
             logger.info("*** Example ***")
             logger.info("guid: %s" % example.guid)
+            logger.info("words: %s" % " ".join([str(x) for x in example.words]))
             logger.info("word_ids: %s" % " ".join([str(x) for x in word_ids]))
             logger.info("char_ids[0]: %s" % " ".join([str(x) for x in char_ids[0]]))
             logger.info("label_ids: %s" % " ".join([str(x) for x in label_ids]))
@@ -304,47 +329,31 @@ def convert_examples_to_features(examples,
     return features
 
 
-def load_and_cache_examples(args, mode):
+def load_data(args, mode):
     processor = TweetProcessor(args)
 
-    # Load data features from cache or dataset file
-    cached_features_file = os.path.join(
-        args.data_dir,
-        'cached_{}_{}_{}'.format(
-            mode,
-            args.max_seq_len,
-            args.max_word_len
-        )
-    )
-
-    if os.path.exists(cached_features_file):
-        logger.info("Loading features from cached file %s", cached_features_file)
-        features = torch.load(cached_features_file)
+    # Load data features from dataset file
+    logger.info("Creating features from dataset file at %s", args.data_dir)
+    if mode == "train":
+        examples = processor.get_examples("train")
+    elif mode == "dev":
+        examples = processor.get_examples("dev")
+    elif mode == "test":
+        examples = processor.get_examples("test")
     else:
-        # Load data features from dataset file
-        logger.info("Creating features from dataset file at %s", args.data_dir)
-        if mode == "train":
-            examples = processor.get_examples("train")
-        elif mode == "dev":
-            examples = processor.get_examples("dev")
-        elif mode == "test":
-            examples = processor.get_examples("test")
-        else:
-            raise Exception("For mode, Only train, dev, test is available")
+        raise Exception("For mode, Only train, dev, test is available")
 
-        word_vocab, char_vocab, _, _ = load_vocab(args)
-        label_vocab = processor.get_label_vocab()
+    word_vocab, char_vocab, _, _ = load_vocab(args)
+    label_vocab = processor.get_label_vocab()
 
-        # Use cross entropy ignore index as padding label id so that only real label ids contribute to the loss later
-        features = convert_examples_to_features(examples,
-                                                processor.load_img_features(),
-                                                args.max_seq_len,
-                                                args.max_word_len,
-                                                word_vocab,
-                                                char_vocab,
-                                                label_vocab)
-        logger.info("Saving features into cached file %s", cached_features_file)
-        torch.save(features, cached_features_file)
+    # Use cross entropy ignore index as padding label id so that only real label ids contribute to the loss later
+    features = convert_examples_to_features(examples,
+                                            processor.load_img_features(),
+                                            args.max_seq_len,
+                                            args.max_word_len,
+                                            word_vocab,
+                                            char_vocab,
+                                            label_vocab)
 
     # Convert to Tensors and build dataset
     all_word_ids = torch.tensor([f.word_ids for f in features], dtype=torch.long)
