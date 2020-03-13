@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.optim import Adam, RMSprop
 
 from data_loader import TweetProcessor, load_word_matrix
-from utils import set_seed, load_vocab
+from utils import set_seed, load_vocab, compute_metrics, report
 from model import ACN
 
 logger = logging.getLogger(__name__)
@@ -154,13 +154,13 @@ class Trainer(object):
                     out_label_list[i].append(slot_label_map[out_labels_ids[i][j]])
                     preds_list[i].append(slot_label_map[preds[i][j]])
 
-        # TODO Reference this part from original code
-        total_result = compute_metrics(intent_preds, out_intent_label_ids, slot_preds_list, out_slot_label_list)
-        results.update(total_result)
+        result = compute_metrics(out_label_list, preds_list)
+        results.update(result)
 
         logger.info("***** Eval results *****")
         for key in sorted(results.keys()):
             logger.info("  %s = %s", key, str(results[key]))
+        logger.info(report(out_label_list, preds_list))  # Get the report for each tag result
 
         return results
 

@@ -4,6 +4,7 @@ import logging
 
 import torch
 import numpy as np
+from seqeval.metrics import precision_score, recall_score, f1_score, classification_report
 
 logger = logging.getLogger(__name__)
 
@@ -54,3 +55,20 @@ def set_seed(args):
     torch.manual_seed(args.seed)
     if not args.no_cuda and torch.cuda.is_available():
         torch.cuda.manual_seed_all(args.seed)
+
+
+def compute_metrics(labels, preds):
+    assert len(labels) == len(preds)
+    return f1_pre_rec(labels, preds)
+
+
+def f1_pre_rec(labels, preds):
+    return {
+        "precision": precision_score(labels, preds),
+        "recall": recall_score(labels, preds),
+        "f1": f1_score(labels, preds),
+    }
+
+
+def report(labels, preds):
+    return classification_report(labels, preds)
