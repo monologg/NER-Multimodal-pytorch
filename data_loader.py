@@ -230,7 +230,7 @@ def load_word_matrix(args, word_vocab):
             coefs = np.asarray(values[1:], dtype='float32')
             embedding_index[word] = coefs
 
-    word_matrix = np.zeros((args.word_vocab_size, args.word_emb_dim))
+    word_matrix = np.zeros((args.word_vocab_size, args.word_emb_dim), dtype='float32')
     cnt = 0
 
     for word, i in word_vocab.items():
