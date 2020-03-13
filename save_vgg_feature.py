@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
         img_feature = img_feature.squeeze(0).view(512, 7 * 7)
         img_feature = img_feature.transpose(1, 0)
-        img_features[img_id] = img_feature
+        img_features[img_id] = img_feature.to("cpu")  # Save as cpu
 
         if (idx + 1) % 100 == 0:
             print("{} done".format(idx + 1))
