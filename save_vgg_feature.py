@@ -134,7 +134,12 @@ if __name__ == "__main__":
         try:
             im = Image.open(img_path)
             im = im.resize((224, 224))
-            im = np.array(im)[:, :, :3]  # Some images have 4th channel, which is transparency value
+            im = np.array(im)
+
+            if im.shape == (224, 224):  # Check whether the channel of image is 1
+                im = np.concatenate((np.expand_dims(im, axis=-1),) * 3, axis=-1)  # Change the channel 1 to 3
+
+            im = im[:, :, :3]  # Some images have 4th channel, which is transparency value
         except Exception as inst:
             print("{} error!".format(img_id))
             print(inst)
@@ -148,7 +153,7 @@ if __name__ == "__main__":
         with torch.no_grad():
             img_feature = model(im)
 
-        img_feature = img_feature.squeeze(0).view(512, 7*7)
+        img_feature = img_feature.squeeze(0).view(512, 7 * 7)
         img_feature = img_feature.transpose(1, 0)
         img_features[img_id] = img_feature
 
