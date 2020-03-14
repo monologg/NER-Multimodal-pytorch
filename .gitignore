@@ -134,7 +134,6 @@ dmypy.json
 .DS_Store
 
 data/img/
-wordvec/
 
 img_vgg_features.pt
 
