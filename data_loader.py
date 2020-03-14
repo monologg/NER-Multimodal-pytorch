@@ -66,10 +66,11 @@ class InputExample(object):
 class InputFeatures(object):
     """A single set of features of data."""
 
-    def __init__(self, word_ids, char_ids, img_feature, label_ids):
+    def __init__(self, word_ids, char_ids, img_feature, mask, label_ids):
         self.word_ids = word_ids
         self.char_ids = char_ids
         self.img_feature = img_feature
+        self.mask = mask
         self.label_ids = label_ids
 
     def __repr__(self):
@@ -235,7 +236,7 @@ def load_word_matrix(args, word_vocab):
 
     # If the compressed one already exists, load it!
     if os.path.exists(compressed_w2v_filename) and not args.overwrite_w2v:
-        word_matrix = np.zeros((args.word_vocab_size, args.word_emb_dim))
+        word_matrix = np.zeros((args.word_vocab_size, args.word_emb_dim), dtype='float32')
         with open(compressed_w2v_filename, 'r', encoding='utf-8') as f:
             for idx, values in enumerate(f):
                 values = values.rstrip().split()
@@ -317,14 +318,18 @@ def convert_examples_to_features(examples,
         for label in example.labels:
             label_ids.append(label_vocab.get(label, label_unk_idx))
 
+        mask = [1] * len(word_ids)
+
         # Padding for word and label
         word_padding_length = max_seq_len - len(word_ids)
         word_ids = word_ids + ([word_pad_idx] * word_padding_length)
         label_ids = label_ids + ([label_pad_idx] * word_padding_length)
+        mask = mask + ([0] * word_padding_length)
 
         word_ids = word_ids[:max_seq_len]
         label_ids = label_ids[:max_seq_len]
         char_ids = char_ids[:max_seq_len]
+        mask = mask[:max_seq_len]
 
         # Additional padding for char if word_padding_length > 0
         if word_padding_length > 0:
@@ -335,6 +340,7 @@ def convert_examples_to_features(examples,
         assert len(word_ids) == max_seq_len, "Error with word_ids length {} vs {}".format(len(word_ids), max_seq_len)
         assert len(char_ids) == max_seq_len, "Error with char_ids length {} vs {}".format(len(char_ids), max_seq_len)
         assert len(label_ids) == max_seq_len, "Error with label_ids length {} vs {}".format(len(label_ids), max_seq_len)
+        assert len(mask) == max_seq_len, "Error with mask length {} vs {}".format(len(mask), max_seq_len)
 
         if ex_index < 5:
             logger.info("*** Example ***")
@@ -342,12 +348,14 @@ def convert_examples_to_features(examples,
             logger.info("words: %s" % " ".join([str(x) for x in example.words]))
             logger.info("word_ids: %s" % " ".join([str(x) for x in word_ids]))
             logger.info("char_ids[0]: %s" % " ".join([str(x) for x in char_ids[0]]))
+            logger.info("mask: %s" % " ".join([str(x) for x in mask]))
             logger.info("label_ids: %s" % " ".join([str(x) for x in label_ids]))
 
         features.append(
             InputFeatures(word_ids=word_ids,
                           char_ids=char_ids,
                           img_feature=img_feature,
+                          mask=mask,
                           label_ids=label_ids
                           ))
 
@@ -383,13 +391,15 @@ def load_data(args, mode):
     # Convert to Tensors and build dataset
     all_word_ids = torch.tensor([f.word_ids for f in features], dtype=torch.long)
     all_char_ids = torch.tensor([f.char_ids for f in features], dtype=torch.long)
-    all_label_ids = torch.tensor([f.label_ids for f in features], dtype=torch.long)
     all_img_feature = torch.stack([f.img_feature for f in features])
+    all_mask = torch.tensor([f.mask for f in features], dtype=torch.long)
+    all_label_ids = torch.tensor([f.label_ids for f in features], dtype=torch.long)
 
     logger.info("all_word_ids.size(): {}".format(all_word_ids.size()))
     logger.info("all_char_ids.size(): {}".format(all_char_ids.size()))
-    logger.info("all_label_ids.size(): {}".format(all_label_ids.size()))
     logger.info("all_img_feature.size(): {}".format(all_img_feature.size()))
+    logger.info("all_mask.size(): {}".format(all_mask.size()))
+    logger.info("all_label_ids.size(): {}".format(all_label_ids.size()))
 
-    dataset = TensorDataset(all_word_ids, all_char_ids, all_label_ids, all_img_feature)
+    dataset = TensorDataset(all_word_ids, all_char_ids, all_img_feature, all_mask, all_label_ids)
     return dataset

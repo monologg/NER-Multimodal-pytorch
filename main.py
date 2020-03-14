@@ -55,8 +55,8 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=42, help="random seed for initialization")
     parser.add_argument("--batch_size", default=16, type=int, help="Batch size for training and evaluation.")
     parser.add_argument("--optimizer", default="rmsprop", type=str, help="Optimizer selected in the list: " + ", ".join(OPTIMIZER_LIST.keys()))
-    parser.add_argument("--learning_rate", default=0.19, type=float, help="The initial learning rate for Adam.")
-    parser.add_argument("--num_train_epochs", default=5.0, type=float, help="Total number of training epochs to perform.")
+    parser.add_argument("--learning_rate", default=0.19, type=float, help="The initial learning rate")
+    parser.add_argument("--num_train_epochs", default=25.0, type=float, help="Total number of training epochs to perform.")
     parser.add_argument("--slot_pad_label", default="[pad]", type=str, help="Pad token for slot label pad (to be ignore when calculate loss)")
     parser.add_argument("--ignore_index", default=0, type=int,
                         help='Specifies a target value that is ignored and does not contribute to the input gradient')

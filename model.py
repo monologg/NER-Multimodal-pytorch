@@ -63,7 +63,6 @@ class BiLSTM(nn.Module):
     def __init__(self, args, pretrained_word_matrix):
         super(BiLSTM, self).__init__()
         self.args = args
-
         self.char_cnn = CharCNN(max_word_len=args.max_word_len,
                                 kernel_lst=args.kernel_lst,
                                 num_filters=args.num_filters,
@@ -172,9 +171,9 @@ class GMF(nn.Module):
     def __init__(self, args):
         super(GMF, self).__init__()
         self.args = args
-        self.text_linear = nn.Linear(args.hidden_dim, args.hidden_dim)  # dim of output_feature isn't written on paper
+        self.text_linear = nn.Linear(args.hidden_dim, args.hidden_dim)  # Inferred from code (dim isn't written on paper)
         self.img_linear = nn.Linear(args.hidden_dim, args.hidden_dim)
-        self.gate_linear = nn.Linear(args.hidden_dim * 2, args.max_seq_len)
+        self.gate_linear = nn.Linear(args.hidden_dim * 2, 1)
 
     def forward(self, att_text_features, att_img_features):
         """
@@ -182,24 +181,33 @@ class GMF(nn.Module):
         :param att_img_features: (batch_size, max_seq_len, hidden_dim)
         :return: multimodal_features
         """
-        new_img_feat = self.img_linear(att_img_features)  # [batch_size, max_seq_len, hidden_dim]
-        new_text_feat = self.text_linear(att_text_features)  # [batch_size, max_seq_len, hidden_dim]
+        new_img_feat = torch.tanh(self.img_linear(att_img_features))  # [batch_size, max_seq_len, hidden_dim]
+        new_text_feat = torch.tanh(self.text_linear(att_text_features))  # [batch_size, max_seq_len, hidden_dim]
 
-        # [batch_size, max_seq_len, max_seq_len]
-        gate_ratio = torch.sigmoid(self.gate_linear(torch.cat([new_img_feat, new_text_feat], dim=-1)))
-        # [batch_size, max_seq_len, hidden_dim]
-        multimodal_features = torch.matmul(gate_ratio, new_img_feat) + torch.matmul(1 - gate_ratio, new_text_feat)
+        gate_img = self.gate_linear(torch.cat([new_img_feat, new_text_feat], dim=-1))  # [batch_size, max_seq_len, 1]
+        gate_img = torch.sigmoid(gate_img)  # [batch_size, max_seq_len, 1]
+        gate_img = gate_img.repeat(1, 1, self.args.hidden_dim)  # [batch_size, max_seq_len, hidden_dim]
+        multimodal_features = torch.mul(gate_img, new_img_feat) + torch.mul(1 - gate_img, new_text_feat)  # [batch_size, max_seq_len, hidden_dim]
+
         return multimodal_features
 
 
 class FiltrationGate(nn.Module):
+    """
+    In this part, code is implemented in other way compare to equation on paper.
+    So I mixed the method between paper and code (e.g. Add `nn.Linear` after the concatenated matrix.)
+    """
+
     def __init__(self, args):
         super(FiltrationGate, self).__init__()
         self.args = args
 
-        self.text_linear = nn.Linear(args.hidden_dim, 1, bias=False)
-        self.multimodal_linear = nn.Linear(args.hidden_dim, 1, bias=True)
-        self.gate_linear = nn.Linear(2, 1)  # To get the scalar value, this part is additionally needed.
+        self.text_linear = nn.Linear(args.hidden_dim, args.hidden_dim, bias=False)
+        self.multimodal_linear = nn.Linear(args.hidden_dim, args.hidden_dim, bias=True)
+        self.gate_linear = nn.Linear(args.hidden_dim * 2, 1)
+
+        self.resv_linear = nn.Linear(args.hidden_dim, args.hidden_dim)
+        self.output_linear = nn.Linear(args.hidden_dim * 2, len(TweetProcessor.get_labels()))
 
     def forward(self, text_features, multimodal_features):
         """
@@ -207,17 +215,23 @@ class FiltrationGate(nn.Module):
         :param multimodal_features: Feature from GMF [batch_size, max_seq_len, hidden_dim]
         :return: output: Will be the input for CRF decoder [batch_size, max_seq_len, hidden_dim]
         """
-        # [batch_size, max_seq_len, 2]
+        # [batch_size, max_seq_len, 2 * hidden_dim]
         concat_feat = torch.cat([self.text_linear(text_features), self.multimodal_linear(multimodal_features)], dim=-1)
-        # [batch_size, max_seq_len, 1]
-        filtration_gate = torch.sigmoid(self.gate_linear(concat_feat))
+        # This part is not written on formula, but this part is needed
+        filtration_gate = torch.sigmoid(self.gate_linear(concat_feat))  # [batch_size, max_seq_len, 1]
+        filtration_gate = filtration_gate.repeat(1, 1, self.args.hidden_dim)  # [batch_size, max_seq_len, hidden_dim]
+
+        reserved_multimodal_feat = torch.mul(filtration_gate,
+                                             torch.tanh(self.resv_linear(multimodal_features)))  # [batch_size, max_seq_len, hidden_dim]
+        output = self.output_linear(torch.cat([text_features, reserved_multimodal_feat], dim=-1))  # [batch_size, max_seq_len, num_tags]
+
         return output
 
 
 class ACN(nn.Module):
     """
     ACN (Adaptive CoAttention Network)
-    CharCNN -> BiLSTM -> CoAttention -> CRF
+    CharCNN -> BiLSTM -> CoAttention -> GMF -> FiltrationGate -> CRF
     """
 
     def __init__(self, args, pretrained_word_matrix=None):
@@ -228,46 +242,31 @@ class ACN(nn.Module):
             nn.Linear(args.img_feat_dim, args.hidden_dim),
             nn.Tanh()
         )
-
+        self.co_attention = CoAttention(args)
+        self.gmf = GMF(args)
+        self.filtration_gate = FiltrationGate(args)
         self.crf = CRF(num_tags=len(TweetProcessor.get_labels()), batch_first=True)
 
-    def forward(self, word_ids, char_ids, img_features):
+    def forward(self, word_ids, char_ids, img_feature, mask, label_ids):
         """
         :param word_ids: (batch_size, max_seq_len)
         :param char_ids: (batch_size, max_seq_len, max_word_len)
-        :param img_features: [batch_size, num_img_region(=49), img_feat_dim(=512)]
+        :param img_feature: [batch_size, num_img_region(=49), img_feat_dim(=512)]
+        :param mask: [batch_size, max_seq_len]
+        :param label_ids: [batch_size, max_seq_len]
         :return:
         """
-        lstm_features = self.lstm(word_ids, char_ids)
-        img_features = self.dim_match(img_features)  # [batch_size, num_img_region(=49), hidden_dim(=200)]
-        assert lstm_features.size(-1) == img_features.size(-1)
+        text_features = self.lstm(word_ids, char_ids)
+        img_features = self.dim_match(img_feature)  # [batch_size, num_img_region(=49), hidden_dim(=200)]
+        assert text_features.size(-1) == img_features.size(-1)
 
+        att_text_features, att_img_features = self.co_attention(text_features, img_features)
+        multimodal_features = self.gmf(att_text_features, att_img_features)
+        logits = self.filtration_gate(text_features, multimodal_features)
 
-if __name__ == '__main__':
-    word_ids = torch.ones((16, 35), dtype=torch.long)
-    char_ids = torch.ones((16, 35, 30), dtype=torch.long)
-    import argparse
+        loss = 0
+        if label_ids is not None:
+            loss = self.crf(logits, label_ids, mask.byte(), reduction='mean')
+            loss = loss * -1  # negative log likelihood
 
-    parser = argparse.ArgumentParser()
-    args = parser.parse_args()
-
-    args.max_seq_len = 35
-    args.device = 'cpu'
-    args.max_word_len = 30
-    args.kernel_lst = "2,3,4"
-    args.num_filters = 32
-    args.char_vocab_size = 200
-    args.char_emb_dim = 30
-    args.final_char_dim = 50
-    args.word_vocab_size = 1000
-    args.word_emb_dim = 200
-    args.hidden_dim = 200
-
-    print(args.max_word_len)
-
-    model = BiLSTM(args, None)
-    model.eval()
-    with torch.no_grad():
-        output = model(word_ids, char_ids)
-
-    print(output.size())
+        return loss, logits

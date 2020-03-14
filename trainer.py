@@ -37,8 +37,8 @@ class Trainer(object):
         self.model = ACN(args, self.pretrained_word_matrix)
 
         # GPU or CPU
-        self.device = "cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu"
-        self.model.to(self.device)
+        self.args.device = "cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu"
+        self.model.to(self.args.device)
 
     def train(self):
         train_sampler = RandomSampler(self.train_dataset)
@@ -66,19 +66,19 @@ class Trainer(object):
             epoch_iterator = tqdm(train_dataloader, desc="Iteration")
             for step, batch in enumerate(epoch_iterator):
                 self.model.train()
-                batch = tuple(t.to(self.device) for t in batch)  # GPU or CPU
+                batch = tuple(t.to(self.args.device) for t in batch)  # GPU or CPU
 
                 inputs = {'word_ids': batch[0],
                           'char_ids': batch[1],
-                          'label_ids': batch[2],
-                          'img_feature': batch[3]}
+                          'img_feature': batch[2],
+                          'mask': batch[3],
+                          'label_ids': batch[4]}
                 outputs = self.model(**inputs)
                 loss = outputs[0]
 
                 loss.backward()
 
                 tr_loss += loss.item()
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.max_grad_norm)
 
                 optimizer.step()
                 self.model.zero_grad()
@@ -112,17 +112,18 @@ class Trainer(object):
         eval_loss = 0.0
         nb_eval_steps = 0
         preds = None
-        out_labels_ids = None
+        out_label_ids = None
 
         self.model.eval()
 
         for batch in tqdm(eval_dataloader, desc="Evaluating"):
-            batch = tuple(t.to(self.device) for t in batch)
+            batch = tuple(t.to(self.args.device) for t in batch)
             with torch.no_grad():
                 inputs = {'word_ids': batch[0],
                           'char_ids': batch[1],
-                          'label_ids': batch[2],
-                          'img_feature': batch[3]}
+                          'img_feature': batch[2],
+                          'mask': batch[3],
+                          'label_ids': batch[4]}
                 outputs = self.model(**inputs)
                 tmp_eval_loss, logits = outputs[:2]
 
@@ -132,11 +133,11 @@ class Trainer(object):
             # Slot prediction
             if preds is None:
                 # decode() in `torchcrf` returns list with best index directly
-                preds = np.array(self.model.crf.decode(logits))
-                out_labels_ids = inputs["labels_ids"].detach().cpu().numpy()
+                preds = np.array(self.model.crf.decode(logits, mask=inputs['mask'].byte()))
+                out_label_ids = inputs["label_ids"].detach().cpu().numpy()
             else:
-                preds = np.append(preds, np.array(self.model.crf.decode(logits)), axis=0)
-                out_slot_labels_ids = np.append(out_labels_ids, inputs["labels_ids"].detach().cpu().numpy(), axis=0)
+                preds = np.append(preds, np.array(self.model.crf.decode(logits, mask=inputs['mask'].byte())), axis=0)
+                out_label_ids = np.append(out_label_ids, inputs["label_ids"].detach().cpu().numpy(), axis=0)
 
         eval_loss = eval_loss / nb_eval_steps
         results = {
@@ -145,13 +146,13 @@ class Trainer(object):
 
         # Slot result
         slot_label_map = {i: label for i, label in enumerate(self.label_lst)}
-        out_label_list = [[] for _ in range(out_labels_ids.shape[0])]
-        preds_list = [[] for _ in range(out_labels_ids.shape[0])]
+        out_label_list = [[] for _ in range(out_label_ids.shape[0])]
+        preds_list = [[] for _ in range(out_label_ids.shape[0])]
 
-        for i in range(out_labels_ids.shape[0]):
-            for j in range(out_labels_ids.shape[1]):
-                if out_labels_ids[i, j] != self.pad_token_label_id:
-                    out_label_list[i].append(slot_label_map[out_labels_ids[i][j]])
+        for i in range(out_label_ids.shape[0]):
+            for j in range(out_label_ids.shape[1]):
+                if out_label_ids[i, j] != self.pad_token_label_id:
+                    out_label_list[i].append(slot_label_map[out_label_ids[i][j]])
                     preds_list[i].append(slot_label_map[preds[i][j]])
 
         result = compute_metrics(out_label_list, preds_list)
@@ -160,7 +161,7 @@ class Trainer(object):
         logger.info("***** Eval results *****")
         for key in sorted(results.keys()):
             logger.info("  %s = %s", key, str(results[key]))
-        logger.info(report(out_label_list, preds_list))  # Get the report for each tag result
+        logger.info("\n" + report(out_label_list, preds_list))  # Get the report for each tag result
 
         return results
 
