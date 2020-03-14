@@ -69,8 +69,7 @@ class BiLSTM(nn.Module):
                                 char_vocab_size=args.char_vocab_size,
                                 char_emb_dim=args.char_emb_dim,
                                 final_char_dim=args.final_char_dim)
-
-        if pretrained_word_matrix != None:
+        if pretrained_word_matrix is not None:
             self.word_emb = nn.Embedding.from_pretrained(pretrained_word_matrix)
         else:
             self.word_emb = nn.Embedding(args.word_vocab_size, args.word_emb_dim, padding_idx=0)
