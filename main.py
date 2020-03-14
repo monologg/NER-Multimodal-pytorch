@@ -47,7 +47,7 @@ if __name__ == '__main__':
     parser.add_argument("--word_emb_dim", default=200, type=int, help="Word embedding size")
     parser.add_argument("--char_emb_dim", default=30, type=int, help="Character embedding size")
     parser.add_argument("--final_char_dim", default=50, type=int, help="Dimension of character cnn output")
-    parser.add_argument("--hidden_dim", default=200, type=int, help="Dimension of BiLSTM output")
+    parser.add_argument("--hidden_dim", default=200, type=int, help="Dimension of BiLSTM output, att layer (denoted as k) etc.")
 
     parser.add_argument("--kernel_lst", default="2,3,4", type=str, help="kernel size for character cnn")
     parser.add_argument("--num_filters", default=32, type=int, help=" Number of filters for character cnn")
