@@ -1,46 +1,16 @@
 import os
-import re
 import copy
 import json
 import logging
-from collections import Counter
 
 import numpy as np
 
 import torch
 from torch.utils.data import TensorDataset
 
-from utils import load_vocab
+from utils import load_vocab, preprocess_word
 
 logger = logging.getLogger(__name__)
-
-
-def preprocess_word(word):
-    """
-    - Do lowercase
-    - Regular expression (number, url, hashtag, user)
-        - https://nlp.stanford.edu/projects/glove/preprocess-twitter.rb
-
-    :param word: str
-    :return: word: str
-    """
-    number_re = r"[-+]?[.\d]*[\d]+[:,.\d]*"
-    url_re = r"https?:\/\/\S+\b|www\.(\w+\.)+\S*"
-    hashtag_re = r"#\S+"
-    user_re = r"@\w+"
-
-    if re.compile(number_re).match(word):
-        word = '<NUMBER>'
-    elif re.compile(url_re).match(word):
-        word = '<URL>'
-    elif re.compile(hashtag_re).match(word):
-        # word = word[1:]  # only erase `#` at the front
-        word = '<HASHTAG>'
-    elif re.compile(user_re).match(word):
-        word = word[1:]  # only erase `@` at the front
-        # word = '<USER>'
-
-    return word.lower()
 
 
 class InputExample(object):
@@ -142,33 +112,22 @@ class TweetProcessor(object):
 
     def _create_examples(self, sentences, set_type):
         """Creates examples for the training dev, and test sets."""
-        words_for_vocab, chars_for_vocab = [], []  # For building vocab when it is train set
         examples = []
 
         for (i, sentence) in enumerate(sentences):
             words, labels, img_id = sentence[0], sentence[1], sentence[2]
             assert len(words) == len(labels)
 
-            if set_type == "train":  # Only save the vocab when it is train set
-                words_for_vocab.extend(words)
-                for word in words:
-                    for char in word:
-                        chars_for_vocab.append(char)
-
             guid = "%s-%s" % (set_type, i)
             if i % 10000 == 0:
                 logger.info(sentence)
             examples.append(InputExample(guid=guid, img_id=img_id, words=words, labels=labels))
 
-        if set_type == 'train':
-            build_vocab(self.args, words_for_vocab, chars_for_vocab)
-
         return examples
 
     def get_examples(self, mode):
         """
-        Args:
-            mode: train, dev, test
+        :param mode: train, dev, test
         """
         file_to_read = None
         if mode == 'train':
@@ -182,68 +141,9 @@ class TweetProcessor(object):
         return self._create_examples(self._read_file(os.path.join(self.args.data_dir, file_to_read)), mode)
 
 
-def build_vocab(args, words, chars):
-    """
-    Save word_vocab, char_vocab as file
-    Write all the tokens in vocab. When loading the vocab, limit the size of vocab at that time
-    """
-    if not os.path.exists(args.vocab_dir):
-        os.mkdir(args.vocab_dir)
-
-    word_vocab, char_vocab = [], []
-
-    word_vocab_path = os.path.join(args.vocab_dir, "word_vocab")
-    char_vocab_path = os.path.join(args.vocab_dir, "char_vocab")
-
-    if not os.path.exists(word_vocab_path) or args.overwrite_vocab:
-        word_counts = Counter(words)
-        word_vocab.append("[pad]")
-        word_vocab.append("[unk]")
-        word_vocab.extend([x[0] for x in word_counts.most_common()])
-        logger.info("Total word vocabulary size: {}".format(len(word_vocab)))
-
-        with open(word_vocab_path, 'w', encoding='utf-8') as f:
-            for word in word_vocab:
-                f.write(word + "\n")
-
-    if not os.path.exists(char_vocab_path) or args.overwrite_vocab:
-        char_counts = Counter(chars)
-        char_vocab.append("[pad]")
-        char_vocab.append("[unk]")
-        char_vocab.extend([x[0] for x in char_counts.most_common()])
-        logger.info("Total char vocabulary size: {}".format(len(char_vocab)))
-
-        with open(char_vocab_path, 'w', encoding='utf-8') as f:
-            for char in char_vocab:
-                f.write(char + "\n")
-
-    # Set the exact vocab size
-    # If the original vocab size is smaller than args.vocab_size, then set args.vocab_size to original one
-    with open(word_vocab_path, 'r', encoding='utf-8') as f:
-        word_lines = f.readlines()
-        args.word_vocab_size = min(len(word_lines), args.word_vocab_size)
-
-    with open(char_vocab_path, 'r', encoding='utf-8') as f:
-        char_lines = f.readlines()
-        args.char_vocab_size = min(len(char_lines), args.char_vocab_size)
-
-
 def load_word_matrix(args, word_vocab):
     if not os.path.exists(args.wordvec_dir):
         os.mkdir(args.wordvec_dir)
-
-    compressed_w2v_filename = os.path.join(args.wordvec_dir, "word_vector_{}".format(args.word_vocab_size))
-
-    # If the compressed one already exists, load it!
-    if os.path.exists(compressed_w2v_filename) and not args.overwrite_w2v:
-        word_matrix = np.zeros((args.word_vocab_size, args.word_emb_dim), dtype='float32')
-        with open(compressed_w2v_filename, 'r', encoding='utf-8') as f:
-            for idx, values in enumerate(f):
-                values = values.rstrip().split()
-                coefs = np.asarray(values, dtype='float32')
-                word_matrix[idx] = coefs
-        word_matrix = torch.from_numpy(word_matrix)
-        return word_matrix
 
     # Making new word vector
     logger.info("Building word matrix...")
@@ -268,9 +168,6 @@ def load_word_matrix(args, word_vocab):
             cnt += 1
     logger.info('{} words not in pretrained matrix'.format(cnt))
 
-    # Save the compressed word vector
-    np.savetxt(compressed_w2v_filename, word_matrix, delimiter=" ", fmt="%1.7f")
-    # Convert numpy to tensor
     word_matrix = torch.from_numpy(word_matrix)
     return word_matrix
 
@@ -345,6 +242,7 @@ def convert_examples_to_features(examples,
         if ex_index < 5:
             logger.info("*** Example ***")
             logger.info("guid: %s" % example.guid)
+            logger.info("img_id: %s" % example.img_id)
             logger.info("words: %s" % " ".join([str(x) for x in example.words]))
             logger.info("word_ids: %s" % " ".join([str(x) for x in word_ids]))
             logger.info("char_ids[0]: %s" % " ".join([str(x) for x in char_ids[0]]))

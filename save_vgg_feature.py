@@ -1,4 +1,5 @@
 import os
+import time
 import argparse
 
 import torch
@@ -125,10 +126,10 @@ if __name__ == "__main__":
                 if line.startswith("IMGID:"):
                     img_id_lst.append(int(line.replace("IMGID:", "").strip()))
 
-    mean_pixel = [103.939, 116.779, 123.68]
+    mean_pixel = [103.939, 116.779, 123.68]  # From original code setting
 
     img_features = {}
-
+    cur_time = time.time()
     for idx, img_id in enumerate(img_id_lst):
         img_path = os.path.join(args.data_dir, args.img_dir, '{}.jpg'.format(img_id))
         try:
@@ -158,7 +159,8 @@ if __name__ == "__main__":
         img_features[img_id] = img_feature.to("cpu")  # Save as cpu
 
         if (idx + 1) % 100 == 0:
-            print("{} done".format(idx + 1))
+            print("{} done - extracted in {:.2f} sec".format(idx + 1, time.time() - cur_time))
+            cur_time = time.time()
 
     # Save features with torch.save
     torch.save(img_features, os.path.join(args.data_dir, args.feature_file))

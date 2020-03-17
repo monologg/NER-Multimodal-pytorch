@@ -33,7 +33,10 @@ class Trainer(object):
         self.pad_token_label_id = args.ignore_index
 
         self.word_vocab, self.char_vocab, self.word_ids_to_tokens, self.char_ids_to_tokens = load_vocab(args)
-        self.pretrained_word_matrix = load_word_matrix(args, self.word_vocab)
+        self.pretrained_word_matrix = None
+        if not args.no_w2v:
+            self.pretrained_word_matrix = load_word_matrix(args, self.word_vocab)
+
         self.model = ACN(args, self.pretrained_word_matrix)
 
         # GPU or CPU
@@ -42,7 +45,7 @@ class Trainer(object):
 
     def train(self):
         train_sampler = RandomSampler(self.train_dataset)
-        train_dataloader = DataLoader(self.train_dataset, sampler=train_sampler, batch_size=self.args.batch_size)
+        train_dataloader = DataLoader(self.train_dataset, sampler=train_sampler, batch_size=self.args.train_batch_size)
 
         # optimizer and schedule (linear warmup and decay)
         if self.args.optimizer not in OPTIMIZER_LIST.keys():
@@ -53,7 +56,7 @@ class Trainer(object):
         logger.info("***** Running training *****")
         logger.info("  Num examples = %d", len(self.train_dataset))
         logger.info("  Num Epochs = %d", self.args.num_train_epochs)
-        logger.info("  Total train batch size = %d", self.args.batch_size)
+        logger.info("  Batch size = %d", self.args.train_batch_size)
 
         global_step = 0
         tr_loss = 0.0
@@ -103,20 +106,19 @@ class Trainer(object):
             raise Exception("Only train, dev and test dataset available")
 
         eval_sampler = SequentialSampler(dataset)
-        eval_dataloader = DataLoader(dataset, sampler=eval_sampler, batch_size=self.args.batch_size)
+        eval_dataloader = DataLoader(dataset, sampler=eval_sampler, batch_size=self.args.eval_batch_size)
 
         # Eval!
         logger.info("***** Running evaluation on %s dataset *****", mode)
         logger.info("  Num examples = %d", len(dataset))
-        logger.info("  Batch size = %d", self.args.batch_size)
+        logger.info("  Batch size = %d", self.args.eval_batch_size)
         eval_loss = 0.0
         nb_eval_steps = 0
         preds = None
         out_label_ids = None
 
-        self.model.eval()
-
         for batch in tqdm(eval_dataloader, desc="Evaluating"):
+            self.model.eval()
             batch = tuple(t.to(self.args.device) for t in batch)
             with torch.no_grad():
                 inputs = {'word_ids': batch[0],
@@ -171,9 +173,10 @@ class Trainer(object):
             os.mkdir(self.args.model_dir)
 
         # Save argument
-        torch.save(self.args, os.path.join(self.args.model_dir, 'args.bin'))
+        torch.save(self.args, os.path.join(self.args.model_dir, 'args.pt'))
         # Save model for inference
-        torch.save(self.model.state_dict(), os.path.join(self.args.model_dir, 'model.bin'))
+        torch.save(self.model.state_dict(), os.path.join(self.args.model_dir, 'model.pt'))
+        logger.info("Saving model checkpoint to {}".format(os.path.join(self.args.model_dir, 'model.pt')))
 
     def load_model(self):
         # Check whether model exists
@@ -182,9 +185,10 @@ class Trainer(object):
 
         try:
             # self.bert_config = self.config_class.from_pretrained(self.args.model_dir)
-            self.args = torch.load(os.path.join(self.args.model_dir, 'args.bin'))
+            self.args = torch.load(os.path.join(self.args.model_dir, 'args.pt'))
             logger.info("***** Args loaded *****")
-            self.model.load_state_dict(torch.load(os.path.join(self.args.model_dir, 'model.bin')))
+            self.model.load_state_dict(torch.load(os.path.join(self.args.model_dir, 'model.pt')))
+            self.model.to(self.args.device)
             logger.info("***** Model Loaded *****")
         except:
             raise Exception("Some model files might be missing...")

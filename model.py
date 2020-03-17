@@ -91,10 +91,7 @@ class BiLSTM(nn.Module):
 
         w_c_emb = torch.cat([w_emb, c_emb], dim=-1)
 
-        h0 = torch.randn(2, w_c_emb.size(0), self.args.hidden_dim // 2).to(self.args.device)
-        c0 = torch.randn(2, w_c_emb.size(0), self.args.hidden_dim // 2).to(self.args.device)
-
-        lstm_output, _ = self.bi_lstm(w_c_emb, (h0, c0))
+        lstm_output, _ = self.bi_lstm(w_c_emb, None)
 
         return lstm_output
 
@@ -194,7 +191,7 @@ class GMF(nn.Module):
 class FiltrationGate(nn.Module):
     """
     In this part, code is implemented in other way compare to equation on paper.
-    So I mixed the method between paper and code (e.g. Add `nn.Linear` after the concatenated matrix.)
+    So I mixed the method between paper and code (e.g. Add `nn.Linear` after the concatenated matrix)
     """
 
     def __init__(self, args):
