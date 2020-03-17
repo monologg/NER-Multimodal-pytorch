@@ -5,7 +5,7 @@
 ## Model
 
 <p float="left" align="center">
-    <img width="800" src="https://user-images.githubusercontent.com/28896432/76892333-de934800-68cd-11ea-93ff-16cb22a5cc3f.png" />  
+    <img width="700" src="https://user-images.githubusercontent.com/28896432/76892333-de934800-68cd-11ea-93ff-16cb22a5cc3f.png" />  
 </p>
 
 ## Dependencies
@@ -28,20 +28,20 @@ $ pip3 install -r requirements.txt
 | --------- | ----- | ----- | ----- |
 | # of Data | 4,000 | 1,000 | 3,257 |
 
-### Pretrained Word Vectors
+### 1. Pretrained Word Vectors
 
 - Original code's pretrained word embedding can be downloaded at [here](https://pan.baidu.com/s/1boSlljL#list/path=%2F).
 - But it takes quite long time to download, so I take out the word vectors that are only in word vocab.
 - **It will be downloaded automatically when you run `main.py`.**
 
-### Extracted VGG Features
+### 2. Extracted VGG Features
 
-- Image features are extracted from last pooling layer of `VGG16`.
+- Image features are extracted from **last pooling layer** of `VGG16`.
 - If you want to extract the feature by yourself, follow as below.
 
   1. Clone the repo of [original code](https://github.com/jlfu/NERmultimodal).
   2. Copy `data/ner_img` from original code to this repo.
-  3. Run as below. `img_vgg_features.pt` will be saved in `data` dir.
+  3. Run as below. (`img_vgg_features.pt` will be saved in `data` dir)
 
   ```bash
   $ python3 save_vgg_feature.py
@@ -51,7 +51,7 @@ $ pip3 install -r requirements.txt
 
 ## Detail
 
-- There are some differences between the `paper` and the `original code`, so I tried to follow the paper's equations as possible.
+- There are some differences between the `paper` and the `original code`, **so I tried to follow the paper's equations as possible.**
 - Build the vocab with `train`, `dev`, and `test` dataset. (same as the original code)
   - Making the vocab only with train dataset decreases performance a lot. (about 5%)
 - Use `Adam` optimizer instead of `RMSProp`.
