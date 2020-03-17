@@ -1,7 +1,10 @@
 import os
+import re
 import random
 import logging
+from collections import Counter
 
+import gdown
 import torch
 import numpy as np
 from seqeval.metrics import precision_score, recall_score, f1_score, classification_report
@@ -9,10 +12,115 @@ from seqeval.metrics import precision_score, recall_score, f1_score, classificat
 logger = logging.getLogger(__name__)
 
 
+def download(args):
+    """ Download vgg features and pretrained word vector """
+    vgg_path = os.path.join(args.data_dir, args.img_feature_file)
+    w2v_path = os.path.join(args.wordvec_dir, args.w2v_file)
+    # 1. vgg features
+    if not os.path.exists(vgg_path):
+        logger.info("Downloading vgg img features...")
+        gdown.download("https://drive.google.com/uc?id=1q9CRm5gCuU9EVEA6Y4xYp6naskTL0bs4", vgg_path, quiet=False)
+
+    # 2. Pretrained word vectors
+    if not os.path.exists(w2v_path):
+        logger.info("Downloading pretrained word vectors...")
+        gdown.download("https://drive.google.com/uc?id=1jfIztxGXQJLCYHxSPBIOaSDeySvevti-", w2v_path, quiet=False)
+
+
 def init_logger():
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                         datefmt='%m/%d/%Y %H:%M:%S',
                         level=logging.INFO)
+
+
+def preprocess_word(word):
+    """
+    - Do lowercase
+    - Regular expression (number, url, hashtag, user)
+        - https://nlp.stanford.edu/projects/glove/preprocess-twitter.rb
+
+    :param word: str
+    :return: word: str
+    """
+    number_re = r"[-+]?[.\d]*[\d]+[:,.\d]*"
+    url_re = r"https?:\/\/\S+\b|www\.(\w+\.)+\S*"
+    hashtag_re = r"#\S+"
+    user_re = r"@\w+"
+
+    if re.compile(number_re).match(word):
+        word = '<NUMBER>'
+    elif re.compile(url_re).match(word):
+        word = '<URL>'
+    elif re.compile(hashtag_re).match(word):
+        word = word[1:]  # only erase `#` at the front
+    elif re.compile(user_re).match(word):
+        word = word[1:]  # only erase `@` at the front
+
+    word = word.lower()
+
+    return word
+
+
+def build_vocab(args):
+    """
+    Build vocab from train, dev and test set
+    Write all the tokens in vocab. When loading the vocab, limit the size of vocab at that time
+    """
+    # Read all the files
+    words, chars = [], []
+
+    for filename in [args.train_file, args.dev_file, args.test_file]:
+        with open(os.path.join(args.data_dir, filename), 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line != "":
+                    if not line.startswith('IMGID:'):
+                        word = line.split('\t')[0]
+                        word = preprocess_word(word)
+                        words.append(word)
+                        for char in word:
+                            chars.append(char)
+
+    if not os.path.exists(args.vocab_dir):
+        os.mkdir(args.vocab_dir)
+
+    word_vocab, char_vocab = [], []
+
+    word_vocab_path = os.path.join(args.vocab_dir, "word_vocab")
+    char_vocab_path = os.path.join(args.vocab_dir, "char_vocab")
+
+    word_counts = Counter(words)
+    word_vocab.append("[pad]")
+    word_vocab.append("[unk]")
+    word_vocab.extend([x[0] for x in word_counts.most_common()])
+    logger.info("Total word vocabulary size: {}".format(len(word_vocab)))
+
+    with open(word_vocab_path, 'w', encoding='utf-8') as f:
+        for word in word_vocab:
+            f.write(word + "\n")
+
+    char_counts = Counter(chars)
+    char_vocab.append("[pad]")
+    char_vocab.append("[unk]")
+    char_vocab.extend([x[0] for x in char_counts.most_common()])
+    logger.info("Total char vocabulary size: {}".format(len(char_vocab)))
+
+    with open(char_vocab_path, 'w', encoding='utf-8') as f:
+        for char in char_vocab:
+            f.write(char + "\n")
+
+    # Set the exact vocab size
+    # If the original vocab size is smaller than args.vocab_size, then set args.vocab_size to original one
+    with open(word_vocab_path, 'r', encoding='utf-8') as f:
+        word_lines = f.readlines()
+        args.word_vocab_size = min(len(word_lines), args.word_vocab_size)
+
+    with open(char_vocab_path, 'r', encoding='utf-8') as f:
+        char_lines = f.readlines()
+        args.char_vocab_size = min(len(char_lines), args.char_vocab_size)
+
+    logger.info("args.word_vocab_size: {}".format(args.word_vocab_size))
+    logger.info("args.char_vocab_size: {}".format(args.char_vocab_size))
 
 
 def load_vocab(args):
