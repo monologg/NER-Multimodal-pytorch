@@ -133,7 +133,7 @@ dmypy.json
 .idea/
 .DS_Store
 
-data/img/
+data/ner_img/
 
 img_vgg_features.pt
 

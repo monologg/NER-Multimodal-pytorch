@@ -107,7 +107,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--data_dir", default="data", type=str, help="Path for data dir")
-    parser.add_argument("--img_dir", default="img", type=str, help="Path for img dir")
+    parser.add_argument("--img_dir", default="ner_img", type=str, help="Path for img dir")
     parser.add_argument("--feature_file", default="img_vgg_features.pt", type=str, help="Filename for preprocessed image features")
 
     args = parser.parse_args()
