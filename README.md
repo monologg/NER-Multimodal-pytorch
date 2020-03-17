@@ -5,7 +5,7 @@
 ## Model
 
 <p float="left" align="center">
-    <img width="600" src="https://user-images.githubusercontent.com/28896432/76892333-de934800-68cd-11ea-93ff-16cb22a5cc3f.png" />  
+    <img width="800" src="https://user-images.githubusercontent.com/28896432/76892333-de934800-68cd-11ea-93ff-16cb22a5cc3f.png" />  
 </p>
 
 ## Dependencies
@@ -51,10 +51,10 @@ $ pip3 install -r requirements.txt
 
 ## Detail
 
-- Build the vocab with `train`, `dev`, and `test` dataset (same as the original code)
-  - Making the vocab only with train dataset decreases performance a lot (about 5%)
-- Use `Adam` optimizer instead of `RMSProp`
 - There are some differences between the `paper` and the `original code`, so I tried to follow the paper's equations as possible.
+- Build the vocab with `train`, `dev`, and `test` dataset. (same as the original code)
+  - Making the vocab only with train dataset decreases performance a lot. (about 5%)
+- Use `Adam` optimizer instead of `RMSProp`.
 
 ## How to run
 
