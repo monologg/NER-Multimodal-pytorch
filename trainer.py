@@ -40,8 +40,8 @@ class Trainer(object):
         self.model = ACN(args, self.pretrained_word_matrix)
 
         # GPU or CPU
-        self.args.device = "cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu"
-        self.model.to(self.args.device)
+        self.device = "cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu"
+        self.model.to(self.device)
 
     def train(self):
         train_sampler = RandomSampler(self.train_dataset)
@@ -69,7 +69,7 @@ class Trainer(object):
             epoch_iterator = tqdm(train_dataloader, desc="Iteration")
             for step, batch in enumerate(epoch_iterator):
                 self.model.train()
-                batch = tuple(t.to(self.args.device) for t in batch)  # GPU or CPU
+                batch = tuple(t.to(self.device) for t in batch)  # GPU or CPU
 
                 inputs = {'word_ids': batch[0],
                           'char_ids': batch[1],
@@ -119,7 +119,7 @@ class Trainer(object):
 
         for batch in tqdm(eval_dataloader, desc="Evaluating"):
             self.model.eval()
-            batch = tuple(t.to(self.args.device) for t in batch)
+            batch = tuple(t.to(self.device) for t in batch)
             with torch.no_grad():
                 inputs = {'word_ids': batch[0],
                           'char_ids': batch[1],
@@ -188,7 +188,7 @@ class Trainer(object):
             self.args = torch.load(os.path.join(self.args.model_dir, 'args.pt'))
             logger.info("***** Args loaded *****")
             self.model.load_state_dict(torch.load(os.path.join(self.args.model_dir, 'model.pt')))
-            self.model.to(self.args.device)
+            self.model.to(self.device)
             logger.info("***** Model Loaded *****")
         except:
             raise Exception("Some model files might be missing...")
