@@ -213,7 +213,7 @@ class FiltrationGate(nn.Module):
         """
         # [batch_size, max_seq_len, 2 * hidden_dim]
         concat_feat = torch.cat([self.text_linear(text_features), self.multimodal_linear(multimodal_features)], dim=-1)
-        # This part is not written on formula, but this part is needed
+        # This part is not written on equation, but if is needed
         filtration_gate = torch.sigmoid(self.gate_linear(concat_feat))  # [batch_size, max_seq_len, 1]
         filtration_gate = filtration_gate.repeat(1, 1, self.args.hidden_dim)  # [batch_size, max_seq_len, hidden_dim]
 
