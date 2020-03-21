@@ -114,7 +114,7 @@ class CoAttention(nn.Module):
     def forward(self, text_features, img_features):
         """
         :param text_features: (batch_size, max_seq_len, hidden_dim)
-        :param img_features: (batch_size, num_img_region, hidden_im)
+        :param img_features: (batch_size, num_img_region, hidden_dim)
         :return att_text_features (batch_size, max_seq_len, hidden_dim)
                 att_img_features (batch_size, max_seq_len, hidden_dim)
         """
@@ -247,9 +247,9 @@ class ACN(nn.Module):
         """
         :param word_ids: (batch_size, max_seq_len)
         :param char_ids: (batch_size, max_seq_len, max_word_len)
-        :param img_feature: [batch_size, num_img_region(=49), img_feat_dim(=512)]
-        :param mask: [batch_size, max_seq_len]
-        :param label_ids: [batch_size, max_seq_len]
+        :param img_feature: (batch_size, num_img_region(=49), img_feat_dim(=512))
+        :param mask: (batch_size, max_seq_len)
+        :param label_ids: (batch_size, max_seq_len)
         :return:
         """
         text_features = self.lstm(word_ids, char_ids)
