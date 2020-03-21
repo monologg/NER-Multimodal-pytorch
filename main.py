@@ -41,7 +41,6 @@ if __name__ == '__main__':
     parser.add_argument("--max_seq_len", default=35, type=int, help="Max sentence length")
     parser.add_argument("--max_word_len", default=30, type=int, help="Max word length")
 
-    parser.add_argument("--overwrite_w2v", action="store_true", help="Overwriting word vector")
     parser.add_argument("--word_vocab_size", default=23204, type=int, help="Maximum size of word vocabulary")
     parser.add_argument("--char_vocab_size", default=102, type=int, help="Maximum size of character vocabulary")
 
