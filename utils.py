@@ -12,19 +12,12 @@ from seqeval.metrics import precision_score, recall_score, f1_score, classificat
 logger = logging.getLogger(__name__)
 
 
-def download(args):
-    """ Download vgg features and pretrained word vector """
+def download_vgg_features(args):
+    """ Download vgg features"""
     vgg_path = os.path.join(args.data_dir, args.img_feature_file)
-    w2v_path = os.path.join(args.wordvec_dir, args.w2v_file)
-    # 1. vgg features
     if not os.path.exists(vgg_path):
         logger.info("Downloading vgg img features...")
         gdown.download("https://drive.google.com/uc?id=1q9CRm5gCuU9EVEA6Y4xYp6naskTL0bs4", vgg_path, quiet=False)
-
-    # 2. Pretrained word vectors
-    if not os.path.exists(w2v_path):
-        logger.info("Downloading pretrained word vectors...")
-        gdown.download("https://drive.google.com/uc?id=1jfIztxGXQJLCYHxSPBIOaSDeySvevti-", w2v_path, quiet=False)
 
 
 def init_logger():

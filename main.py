@@ -1,13 +1,13 @@
 import argparse
 
 from trainer import Trainer, OPTIMIZER_LIST
-from utils import init_logger, build_vocab, download
+from utils import init_logger, build_vocab, download_vgg_features
 from data_loader import load_data
 
 
 def main(args):
     init_logger()
-    download(args)
+    download_vgg_features(args)
     build_vocab(args)
 
     train_dataset = load_data(args, mode="train")
