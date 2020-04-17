@@ -32,7 +32,6 @@ $ pip3 install -r requirements.txt
 
 - Original code's pretrained word embedding can be downloaded at [here](https://pan.baidu.com/s/1boSlljL#list/path=%2F).
 - But it takes quite long time to download, so I take out the word vectors that are only in word vocab.
-- **It will be downloaded automatically when you run `main.py`.**
 
 ### 2. Extracted VGG Features
 
