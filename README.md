@@ -65,7 +65,7 @@ $ python3 main.py --do_train --do_eval
 
 |                       | F1 (%)    |
 | --------------------- | --------- |
-| **Re-implementation** | **67.10** |
+| **Re-implementation** | **67.17** |
 | Baseline (paper)      | 70.69     |
 
 ## References

@@ -1,12 +1,13 @@
 import argparse
 
 from trainer import Trainer, OPTIMIZER_LIST
-from utils import init_logger, build_vocab, download_vgg_features
+from utils import init_logger, build_vocab, download_vgg_features, set_seed
 from data_loader import load_data
 
 
 def main(args):
     init_logger()
+    set_seed(args)
     download_vgg_features(args)
     build_vocab(args)
 
@@ -52,12 +53,12 @@ if __name__ == '__main__':
     parser.add_argument("--kernel_lst", default="2,3,4", type=str, help="kernel size for character cnn")
     parser.add_argument("--num_filters", default=32, type=int, help=" Number of filters for character cnn")
 
-    parser.add_argument('--seed', type=int, default=42, help="random seed for initialization")
+    parser.add_argument('--seed', type=int, default=7, help="random seed for initialization")
     parser.add_argument("--train_batch_size", default=16, type=int, help="Batch size for training")
     parser.add_argument("--eval_batch_size", default=32, type=int, help="Batch size for evaluation")
     parser.add_argument("--optimizer", default="adam", type=str, help="Optimizer selected in the list: " + ", ".join(OPTIMIZER_LIST.keys()))
-    parser.add_argument("--learning_rate", default=0.005, type=float, help="The initial learning rate")
-    parser.add_argument("--num_train_epochs", default=15.0, type=float, help="Total number of training epochs to perform.")
+    parser.add_argument("--learning_rate", default=0.001, type=float, help="The initial learning rate")
+    parser.add_argument("--num_train_epochs", default=5.0, type=float, help="Total number of training epochs to perform.")
     parser.add_argument("--slot_pad_label", default="[pad]", type=str, help="Pad token for slot label pad (to be ignore when calculate loss)")
     parser.add_argument("--ignore_index", default=0, type=int,
                         help='Specifies a target value that is ignored and does not contribute to the input gradient')

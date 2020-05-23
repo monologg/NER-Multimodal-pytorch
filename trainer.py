@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.optim import Adam, RMSprop
 
 from data_loader import TweetProcessor, load_word_matrix
-from utils import set_seed, load_vocab, compute_metrics, report
+from utils import load_vocab, compute_metrics, report
 from model import ACN
 
 logger = logging.getLogger(__name__)
@@ -63,7 +63,6 @@ class Trainer(object):
         self.model.zero_grad()
 
         train_iterator = trange(int(self.args.num_train_epochs), desc="Epoch")
-        set_seed(self.args)
 
         for _ in train_iterator:
             epoch_iterator = tqdm(train_dataloader, desc="Iteration")
